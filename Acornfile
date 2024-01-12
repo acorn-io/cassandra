@@ -1,0 +1,84 @@
+name:        "Cassandra Acorn"
+description: "Acorn providing Cassandra"
+readme:      "./README.md"
+info:        localData.info
+icon:        "./icon.png"
+
+args: {
+	version:  "4.1.3"
+	keyspace: "mykeyspace"
+}
+
+services: db: {
+	default: true
+	generated: job: "setup"
+}
+
+containers: cassandra: {
+	name:        "Cassandra"
+	description: "Container running a Cassandra database"
+	image:       "cassandra:\(args.version)"
+	env: {
+    "HEAP_NEWSIZE": "100M"
+    "MAX_HEAP_SIZE": "256M"
+	}
+	ports: publish: "9042/tcp"
+	probes: [
+		{
+			type:                "readiness"
+			initialDelaySeconds: 5
+			timeoutSeconds:      5
+			tcp: {
+				url: "tcp://localhost:9042"
+			}
+		},
+	]
+}
+
+jobs: setup: {
+	name:  "configure Cassandra"
+	image: "cassandra:\(args.version)"
+	dirs: "/acorn/scripts/": "./scripts"
+	dependsOn: ["cassandra"]
+	entrypoint: ["/acorn/scripts/init.sh"]
+	env: {
+		DB_USER:     "secret://admin/username"
+		DB_PASS:     "secret://admin/password"
+		DB_KEYSPACE: args.keyspace
+	}
+	events: ["create", "update"]
+}
+
+secrets: {
+	admin: {
+		name: "credentials of the admin user"
+		type: "basic"
+		params: {
+			passwordLength:     10
+			passwordCharacters: "A-Za-z0-9"
+		}
+		data: {
+			username: "admin"
+			password: ""
+		}
+	}
+}
+
+localData: info: """
+	## Usage
+
+	services: db: {
+		image: "ghcr.io/acorn-io/cassandra:v#.#.#-#"
+	}
+
+	containers: app: {
+		image: "app-image"
+		env: {
+		  DB_HOST: "@{@{service.}db.address}"
+		  DB_PORT: "@{@{service.}db.port.9042}"
+		  DB_USER: "@{@{service.}db.secrets.admin.username}"
+		  DB_PASS: "@{@{service.}db.secrets.admin.password}"
+			DB_KEYSPACE: "@{@{service.}db.data.keyspace}"
+		}
+	}
+	"""

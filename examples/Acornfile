@@ -1,0 +1,28 @@
+services: db: {
+	if args.dev {
+		build: {
+			context:   "../"
+			acornfile: "../Acornfile"
+		}
+	} else {
+		image: "ghcr.io/acorn-io/cassandra:v#.#.#-#"
+	}
+}
+
+containers: {
+	app: {
+		build: {
+			context: "."
+			target:  "dev"
+		}
+		consumes: ["db"]
+		ports: publish: "8000/http"
+		env: {
+			DB_HOST: "@{service.db.address}"
+			DB_PORT: "@{service.db.port.9042}"
+			DB_KEYSPACE: "@{service.db.data.keyspace}"
+			DB_USER: "@{service.db.secrets.admin.username}"
+			DB_PASS: "@{service.db.secrets.admin.password}"
+		}
+	}
+}
